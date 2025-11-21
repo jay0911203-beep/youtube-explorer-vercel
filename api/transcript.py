@@ -2,6 +2,7 @@
 import json
 import sys
 import os
+from urllib.parse import parse_qs, urlparse
 
 # 라이브러리 경로 설정
 try:
