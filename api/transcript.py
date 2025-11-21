@@ -1,62 +1,61 @@
-from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+
 import json
 import sys
 import os
 
-# Vercel 환경에서 의존성 로드
+# 라이브러리 경로 설정
 try:
+    sys.path.append(os.path.join(os.path.dirname(__file__), "node_modules"))
     from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 except ImportError:
     YouTubeTranscriptApi = None
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+def handler(event, context):
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS'
+    }
 
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
+    if event['httpMethod'] == 'OPTIONS':
+        return {'statusCode': 200, 'headers': headers, 'body': ''}
 
-        path = urlparse(self.path)
-        params = parse_qs(path.query)
-        video_id = params.get('videoId', [None])[0]
+    params = event.get('queryStringParameters', {})
+    video_id = params.get('videoId')
 
-        if not video_id:
-            self.wfile.write(json.dumps({'error': 'Video ID required'}).encode('utf-8'))
-            return
+    if not video_id:
+        return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Video ID required'})}
 
-        if not YouTubeTranscriptApi:
-            self.wfile.write(json.dumps({'error': 'Server config error'}).encode('utf-8'))
-            return
+    if not YouTubeTranscriptApi:
+         return {'statusCode': 500, 'headers': headers, 'body': json.dumps({'error': 'Server config error'})}
 
+    try:
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-            
+            transcript = transcript_list.find_transcript(['ko'])
+        except:
             try:
-                transcript = transcript_list.find_transcript(['ko'])
+                transcript = transcript_list.find_transcript(['en'])
             except:
-                try:
-                    transcript = transcript_list.find_transcript(['en'])
-                except:
-                    transcript = transcript_list.find_generated_transcript(['ko', 'en'])
+                transcript = transcript_list.find_generated_transcript(['ko', 'en'])
 
-            data = transcript.fetch()
-            full_text = " ".join([item['text'] for item in data])
-            clean_text = full_text.replace('\n', ' ').replace('  ', ' ')
-
-            response_data = {
+        data = transcript.fetch()
+        full_text = " ".join([item['text'] for item in data])
+        
+        return {
+            'statusCode': 200,
+            'headers': headers,
+            'body': json.dumps({
                 'success': True, 
-                'transcript': clean_text, 
+                'transcript': full_text.replace('\n', ' '), 
                 'lang': transcript.language_code
-            }
-            self.wfile.write(json.dumps(response_data).encode('utf-8'))
+            })
+        }
 
-        except Exception as e:
-            self.wfile.write(json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': headers,
+            'body': json.dumps({'success': False, 'error': str(e)})
+        }
