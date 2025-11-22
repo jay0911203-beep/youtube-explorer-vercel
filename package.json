@@ -1,6 +1,6 @@
 {
-  "name": "youtube-explorer-vercel",
-  "version": "4.1.0",
+  "name": "youtube-explorer-vercel-py",
+  "version": "4.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
