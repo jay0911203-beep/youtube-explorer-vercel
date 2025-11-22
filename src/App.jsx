@@ -11,13 +11,9 @@ export default function App() {
   const [channelVideos, setChannelVideos] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [nextPageToken, setNextPageToken] = useState(null);
-  
-  const [transcriptModal, setTranscriptModal] = useState({ 
-    isOpen: false, videoId: null, title: '', content: '', loading: false, status: '', logs: []
-  });
+  const [transcriptModal, setTranscriptModal] = useState({ isOpen: false, videoId: null, title: '', content: '', loading: false, status: '', logs: [] });
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // GitHub State
   const [showGithubModal, setShowGithubModal] = useState(false);
   const [ghToken, setGhToken] = useState('');
   const [ghRepoName, setGhRepoName] = useState('');
@@ -37,9 +33,7 @@ export default function App() {
     if(t&&u&&r) setIsConfigured(true);
   }, []);
 
-  useEffect(() => {
-    if(apiKey) localStorage.setItem('yt_api_key', apiKey);
-  }, [apiKey]);
+  useEffect(() => { if(apiKey) localStorage.setItem('yt_api_key', apiKey); }, [apiKey]);
 
   useEffect(() => {
     if(ghToken) {
@@ -71,7 +65,7 @@ export default function App() {
     setDeployStatus({ type: 'loading', message: '배포 중...' });
     try {
       if(mode === 'create') await createRepo();
-      setDeployStatus({ type: 'success', message: '완료! Sync 버튼을 눌러주세요.' });
+      setDeployStatus({ type: 'success', message: '완료! Vercel에서 확인하세요.' });
     } catch (e) { setDeployStatus({ type: 'error', message: e.message }); }
   };
 
@@ -83,8 +77,7 @@ export default function App() {
   };
 
   const decodeHtml = (h) => { try { const t = document.createElement("textarea"); t.innerHTML = h; return t.value; } catch(e){return h;} };
-  const formatCount = (c) => { const n = parseInt(c||0); return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n.toLocaleString(); };
-
+  
   const searchChannels = async (e) => {
     e.preventDefault(); if(!query.trim()) return; setLoading(true); setViewMode('search');
     try {
@@ -120,20 +113,18 @@ export default function App() {
     } catch(e){}
   };
 
-  // [핵심] DownSub Logic (Link)
   const openDownSub = (videoId) => {
     const youtubeUrl = 'https://www.youtube.com/watch?v=' + videoId;
     const downsubUrl = 'https://downsub.com/?url=' + encodeURIComponent(youtubeUrl);
     window.open(downsubUrl, '_blank');
   };
 
-  // [핵심] Vercel Server API Call
   const getTranscript = async (title, videoId) => {
     setTranscriptModal({ isOpen: true, videoId, title, content: '', loading: true, status: '연결 중...', logs: [] });
     const addLog = (msg) => setTranscriptModal(p => ({...p, logs: [...p.logs, msg], status: msg}));
     
     try {
-      const isPreview = window.location.hostname.includes('webcontainer');
+      const isPreview = window.location.hostname.includes('webcontainer') || window.location.hostname.includes('localhost');
       
       if (!isPreview) {
           try {
@@ -149,7 +140,6 @@ export default function App() {
           } catch(e) { addLog('서버 연결 실패.'); }
       }
 
-      // Fallback: DownSub 안내
       setTranscriptModal(p => ({...p, loading: false, error: '자막을 가져올 수 없습니다. 아래 DownSub 버튼을 이용해주세요.', status: '실패'}));
 
     } catch (err) {
@@ -270,7 +260,7 @@ export default function App() {
             <form onSubmit={searchChannels} className="flex gap-2 max-w-lg mx-auto mb-8"><input value={query} onChange={e=>setQuery(e.target.value)} className="flex-1 p-3 rounded-full border shadow-sm focus:border-red-500 transition-all" placeholder="채널 검색..."/><button className="bg-red-600 text-white px-6 rounded-full hover:bg-red-700 transition-colors font-medium">검색</button></form>
             {loading && <div className="flex justify-center py-10"><Loader2 className="animate-spin text-red-600" size={40}/></div>}
             {viewMode === 'search' && !loading && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in">{channels.map(c => (<div key={c.id.channelId} onClick={()=>handleChannelClick(c.id.channelId, decodeHtml(c.snippet.title))} className="bg-white p-4 rounded-xl shadow cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all text-center border border-transparent hover:border-red-100"><img src={c.snippet.thumbnails.medium.url} className="w-20 h-20 rounded-full mx-auto mb-3 ring-4 ring-gray-50"/><h3 className="font-bold line-clamp-1 text-gray-800">{decodeHtml(c.snippet.title)}</h3><span className="text-xs text-red-500 font-medium mt-2 inline-block">채널 보기</span></div>))}</div>}
-            {viewMode === 'videos' && !loading && <div className="animate-in slide-in-from-right-4"><div className="flex items-center gap-4 mb-6"><button onClick={()=>setViewMode('search')} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><ChevronLeft size={24}/></button><h2 className="text-2xl font-bold text-gray-800">{decodeHtml(selectedChannel?.title)}</h2></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{channelVideos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow overflow-hidden border border-gray-100 flex flex-col group"><div className="aspect-video bg-gray-200 relative"><img src={v.snippet.thumbnails.medium?.url} className="w-full h-full object-cover"/><div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"><Play className="text-white drop-shadow-lg" fill="white" size={48}/></div></div><div className="p-4 flex-1 flex flex-col"><h3 className="font-bold text-sm line-clamp-2 mb-3 h-10 leading-snug">{decodeHtml(v.snippet.title)}</h3><div className="mt-auto pt-3 border-t border-gray-50"><button onClick={()=>getTranscript(decodeHtml(v.snippet.title), v.snippet.resourceId.videoId)} className="w-full py-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 flex items-center justify-center gap-1.5 transition-colors"><Globe size={14}/> 자막 추출</button><button onClick={()=>openDownSub(v.snippet.resourceId.videoId)} className="w-full py-2.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 flex items-center justify-center gap-1.5 transition-colors mt-2"><ExternalLink size={14}/> DownSub</button></div></div></div>))}</div>{nextPageToken && <div className="text-center mt-8"><button onClick={loadMore} className="px-6 py-2 bg-white border rounded-full text-sm hover:bg-gray-50 transition-colors font-medium shadow-sm">더 보기</button></div>}</div>}
+            {viewMode === 'videos' && !loading && <div className="animate-in slide-in-from-right-4"><div className="flex items-center gap-4 mb-6"><button onClick={()=>setViewMode('search')} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><ChevronLeft size={24}/></button><h2 className="text-2xl font-bold text-gray-800">{decodeHtml(selectedChannel?.title)}</h2></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{channelVideos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow overflow-hidden border border-gray-100 flex flex-col group"><div className="aspect-video bg-gray-200 relative"><img src={v.snippet.thumbnails.medium?.url} className="w-full h-full object-cover"/><div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"><Play className="text-white drop-shadow-lg" fill="white" size={48}/></div></div><div className="p-4 flex-1 flex flex-col"><h3 className="font-bold text-sm line-clamp-2 mb-3 h-10 leading-snug">{decodeHtml(v.snippet.title)}</h3><div className="mt-auto pt-3 border-t border-gray-50"><button onClick={()=>getTranscript(decodeHtml(v.snippet.title), v.snippet.resourceId.videoId)} className="w-full py-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 flex items-center justify-center gap-1.5 transition-colors"><Globe size={14}/> 자막 추출</button><a href={"https://downsub.com/?url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + v.snippet.resourceId.videoId)} target="_blank" rel="noopener noreferrer" className="w-full py-2.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 flex items-center justify-center gap-1.5 transition-colors mt-2"><ExternalLink size={14}/> DownSub</a></div></div></div>))}</div>{nextPageToken && <div className="text-center mt-8"><button onClick={loadMore} className="px-6 py-2 bg-white border rounded-full text-sm hover:bg-gray-50 transition-colors font-medium shadow-sm">더 보기</button></div>}</div>}
           </>
         )}
       </main>
